@@ -33,8 +33,12 @@
 #include <proto/frontend.h>
 #include <proto/log.h>
 #include <proto/stream_interface.h>
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+#include <proto/cyassl_sock.h>
+#else
 #include <proto/ssl_sock.h>
+#endif
 #endif
 
 const char *log_facilities[NB_LOG_FACILITIES] = {
@@ -1005,19 +1009,29 @@ int build_logline(struct session *s, char *dst, size_t maxsize, struct list *lis
 				if (iret == 0)
 					goto out;
 				tmplog += iret;
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+				if (s->listener->xprt == &cyassl_sock)
+					LOGCHAR('~');
+#else
 				if (s->listener->xprt == &ssl_sock)
 					LOGCHAR('~');
+#endif
 #endif
 				if (tmp->options & LOG_OPT_QUOTE)
 					LOGCHAR('"');
 				last_isspace = 0;
 				break;
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 			case LOG_FMT_SSL_CIPHER: // %sslc
 				src = NULL;
+#ifdef USE_CYASSL
+				if (s->listener->xprt == &cyassl_sock)
+					src = cyassl_sock_get_cipher_name(s->si[0].conn);
+#else
 				if (s->listener->xprt == &ssl_sock)
 					src = ssl_sock_get_cipher_name(s->si[0].conn);
+#endif
 				ret = lf_text(tmplog, src, dst + maxsize - tmplog, tmp);
 				if (ret == NULL)
 					goto out;
@@ -1027,8 +1041,13 @@ int build_logline(struct session *s, char *dst, size_t maxsize, struct list *lis
 
 			case LOG_FMT_SSL_VERSION: // %sslv
 				src = NULL;
+#ifdef USE_CYASSL
+				if (s->listener->xprt == &cyassl_sock)
+					src = cyassl_sock_get_proto_version(s->si[0].conn);
+#else
 				if (s->listener->xprt == &ssl_sock)
 					src = ssl_sock_get_proto_version(s->si[0].conn);
+#endif
 				ret = lf_text(tmplog, src, dst + maxsize - tmplog, tmp);
 				if (ret == NULL)
 					goto out;

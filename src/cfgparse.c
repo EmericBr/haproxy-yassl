@@ -68,11 +68,15 @@
 #include <proto/task.h>
 #include <proto/stick_table.h>
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+#include <proto/cyassl_sock.h>
+#else /* USE_OPENSSL */
 #include <types/ssl_sock.h>
 #include <proto/ssl_sock.h>
 #include <proto/shctx.h>
-#endif /*USE_OPENSSL */
+#endif
+#endif /* USE_OPENSSL || USE_CYASSL */
 
 /* This is the SSLv3 CLIENT HELLO packet used in conjunction with the
  * ssl-hello-chk option to ensure that the remote server speaks SSL.
@@ -470,7 +474,7 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 		goto out;
 	}
 	else if (!strcmp(args[0], "ca-base")) {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 		if (global.ca_base != NULL) {
 			Alert("parsing [%s:%d] : '%s' already specified. Continuing.\n", file, linenum, args[0]);
 			err_code |= ERR_ALERT;
@@ -489,7 +493,7 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 #endif
 	}
 	else if (!strcmp(args[0], "crt-base")) {
-#ifdef USE_OPENSSL
+#if defined (USE_OPENSSL) || defined(USE_CYASSL)
 		if (global.crt_base != NULL) {
 			Alert("parsing [%s:%d] : '%s' already specified. Continuing.\n", file, linenum, args[0]);
 			err_code |= ERR_ALERT;
@@ -571,6 +575,8 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 		}
 		global.tune.sslcachesize = atol(args[1]);
 	}
+#endif
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 	else if (!strcmp(args[0], "tune.ssl.lifetime")) {
 		unsigned int ssllifetime;
 		const char *res;
@@ -840,7 +846,7 @@ int cfg_parse_global(const char *file, int linenum, char **args, int kwm)
 #endif /* SYSTEM_MAXCONN */
 	}
 	else if (!strcmp(args[0], "maxsslconn")) {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 		if (*(args[1]) == 0) {
 			Alert("parsing [%s:%d] : '%s' expects an integer argument.\n", file, linenum, args[0]);
 			err_code |= ERR_ALERT | ERR_FATAL;
@@ -4214,9 +4220,6 @@ stats_error_parsing:
 			newsrv->onerror		= curproxy->defsrv.onerror;
 			newsrv->consecutive_errors_limit
 						= curproxy->defsrv.consecutive_errors_limit;
-#ifdef OPENSSL
-			newsrv->use_ssl		= curproxy->defsrv.use_ssl;
-#endif
 			newsrv->uweight = newsrv->iweight
 						= curproxy->defsrv.iweight;
 
@@ -4747,7 +4750,7 @@ stats_error_parsing:
 			 * default, unless one is specified.
 			 */
 			if (!newsrv->check.port && !is_addr(&newsrv->check.addr)) {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 				newsrv->check.use_ssl |= newsrv->use_ssl;
 #endif
 				newsrv->check.send_proxy |= (newsrv->state & SRV_SEND_PROXY);
@@ -6550,11 +6553,14 @@ out_uri_auth_compat:
 				newsrv->minconn = newsrv->maxconn;
 			}
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined (USE_CYASSL)
 			if (newsrv->use_ssl || newsrv->check.use_ssl)
+#ifdef USE_CYASSL
+				cfgerr += cyassl_sock_prepare_srv_ctx(newsrv, curproxy);
+#else
 				cfgerr += ssl_sock_prepare_srv_ctx(newsrv, curproxy);
 #endif /* USE_OPENSSL */
-
+#endif
 			if (newsrv->trackit) {
 				struct proxy *px;
 				struct server *srv;
@@ -6796,7 +6802,7 @@ out_uri_auth_compat:
 				curproxy->be_req_ana |= AN_REQ_PRST_RDP_COOKIE;
 		}
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 		/* Configure SSL for each bind line.
 		 * Note: if configuration fails at some point, the ->ctx member
 		 * remains NULL so that listeners can later detach.
@@ -6816,6 +6822,10 @@ out_uri_auth_compat:
 				continue;
 			}
 
+#ifdef USE_CYASSL
+			/* initialize all certificate contexts */
+			cfgerr += cyassl_sock_prepare_all_ctx(bind_conf, curproxy);
+#else
 			if (shared_context_init(global.tune.sslcachesize, (global.nbproc > 1) ? 1 : 0) < 0) {
 				Alert("Unable to allocate SSL session cache.\n");
 				cfgerr++;
@@ -6824,8 +6834,9 @@ out_uri_auth_compat:
 
 			/* initialize all certificate contexts */
 			cfgerr += ssl_sock_prepare_all_ctx(bind_conf, curproxy);
-		}
 #endif /* USE_OPENSSL */
+		}
+#endif
 
 		/* adjust this proxy's listeners */
 		next_id = 1;
@@ -6891,13 +6902,18 @@ out_uri_auth_compat:
 		list_for_each_entry(bind_conf, &curproxy->conf.bind, by_fe) {
 			if (bind_conf->is_ssl)
 				continue;
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+			cyassl_sock_free_all_ctx(bind_conf);
+#else /* USE_OPENSSL */
 			ssl_sock_free_all_ctx(bind_conf);
+#endif
 			free(bind_conf->ca_file);
 			free(bind_conf->ciphers);
 			free(bind_conf->ecdhe);
 			free(bind_conf->crl_file);
-#endif /* USE_OPENSSL */
+			free(bind_conf->ciphers);
+#endif /* USE_OPENSSL || USE_CYASSL */
 		}
 
 		/* Check multi-process mode compatibility for the current proxy */

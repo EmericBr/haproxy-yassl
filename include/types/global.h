@@ -65,7 +65,7 @@
 
 /* FIXME : this will have to be redefined correctly */
 struct global {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 	char *crt_base;             /* base directory path for certificates */
 	char *ca_base;              /* base directory path for CAs and CRLs */
 #endif
@@ -73,7 +73,8 @@ struct global {
 	int gid;
 	int nbproc;
 	int maxconn, hardmaxconn;
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+	char *crt_base;             /* base directory path for certificates */
 	int maxsslconn;
 	char *listen_default_ciphers;
 	char *connect_default_ciphers;
@@ -113,7 +114,7 @@ struct global {
 		int pipesize;      /* pipe size in bytes, system defaults if zero */
 		int max_http_hdr;  /* max number of HTTP headers, use MAX_HTTP_HDR if zero */
 		int cookie_len;    /* max length of cookie captures */
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 		int sslcachesize;  /* SSL cache size in session, defaults to 20000 */
 		unsigned int ssllifetime;   /* SSL session lifetime in seconds */
 #endif

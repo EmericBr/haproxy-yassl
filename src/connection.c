@@ -22,8 +22,12 @@
 #include <proto/session.h>
 #include <proto/stream_interface.h>
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+#include <proto/cyassl_sock.h>
+#else
 #include <proto/ssl_sock.h>
+#endif
 #endif
 
 struct pool_head *pool2_connection;
@@ -77,10 +81,16 @@ int conn_fd_handler(int fd)
 		if (conn->flags & CO_FL_LOCAL_SPROXY)
 			if (!conn_local_send_proxy(conn, CO_FL_LOCAL_SPROXY))
 				goto leave;
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+		if (conn->flags & CO_FL_SSL_WAIT_HS)
+			if (!cyassl_sock_handshake(conn, CO_FL_SSL_WAIT_HS))
+				goto leave;
+#else
 		if (conn->flags & CO_FL_SSL_WAIT_HS)
 			if (!ssl_sock_handshake(conn, CO_FL_SSL_WAIT_HS))
 				goto leave;
+#endif
 #endif
 	}
 

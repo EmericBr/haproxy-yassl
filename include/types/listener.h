@@ -28,6 +28,9 @@
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #endif
+#ifdef USE_CYASSL
+#include <cyassl/ssl.h>
+#endif
 
 #include <common/config.h>
 #include <common/mini-clist.h>
@@ -97,7 +100,7 @@ enum {
  * maxconn setting to the global.maxsock value so that its resources are reserved.
  */
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 /* bind_conf ssl options */
 #define BC_SSL_O_NONE           0x0000
 #define BC_SSL_O_NO_SSLV3       0x0001	/* disable SSLv3 */
@@ -115,7 +118,7 @@ enum {
 
 /* "bind" line settings */
 struct bind_conf {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 	char *ca_file;             /* CAfile to use on verify */
 	unsigned long long ca_ignerr;  /* ignored verify errors in handshake if depth > 0 */
 	unsigned long long crt_ignerr; /* ignored verify errors in handshake if depth == 0 */
@@ -124,11 +127,15 @@ struct bind_conf {
 	char *ecdhe;               /* named curve to use for ECDHE */
 	int ssl_options;           /* ssl options */
 	int verify;                /* verify method (set of SSL_VERIFY_* flags) */
+#ifdef USE_CYASSL
+	CYASSL_CTX *default_ctx;   /* SSL context of first/default certificate */
+#else
 	SSL_CTX *default_ctx;      /* SSL context of first/default certificate */
 	char *npn_str;             /* NPN protocol string */
 	int npn_len;               /* NPN protocol string length */
 	struct eb_root sni_ctx;    /* sni_ctx tree of all known certs full-names sorted by name */
 	struct eb_root sni_w_ctx;  /* sni_ctx tree of all known certs wildcards sorted by name */
+#endif
 #endif
 	int is_ssl;                /* SSL is required for these listeners */
 	struct {                   /* UNIX socket permissions */

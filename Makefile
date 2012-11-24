@@ -26,6 +26,7 @@
 #   USE_VSYSCALL         : enable vsyscall on Linux x86, bypassing libc
 #   USE_GETADDRINFO      : use getaddrinfo() to resolve IPv6 host names.
 #   USE_OPENSSL          : enable use of OpenSSL. Recommended, but see below.
+#   USE_CYASSL           : enable use of CyaSSL.
 #   USE_FUTEX            : enable use of futex on kernel 2.6. Automatic.
 #   USE_ACCEPT4          : enable use of accept4() on linux. Automatic.
 #   USE_MY_ACCEPT4       : use own implemention of accept4() if glibc < 2.10.
@@ -510,6 +511,18 @@ OPTIONS_CFLAGS  += -DUSE_SYSCALL_FUTEX
 else
 OPTIONS_LDFLAGS += -lpthread
 endif
+endif
+else
+ifneq ($(USE_CYASSL),)
+# CyaSSL is packaged in various forms and with various dependences.
+# In general -lssl is enough, but on some platforms, -lcrypto may be needed,
+# reason why it's added by default. Some even need -lz, then you'll need to
+# pass it in the "ADDLIB" variable if needed. Similarly, use ADDINC and ADDLIB
+# to specify -I and -L if your OpenSSL library is not in the standard path.
+BUILD_OPTIONS   += $(call ignore_implicit,USE_CYASSL)
+OPTIONS_CFLAGS  += -DUSE_CYASSL
+OPTIONS_LDFLAGS += -lcyassl -lm
+OPTIONS_OBJS  += src/cyassl_sock.o
 endif
 endif
 

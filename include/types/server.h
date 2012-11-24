@@ -28,6 +28,9 @@
 #ifdef USE_OPENSSL
 #include <openssl/ssl.h>
 #endif
+#ifdef USE_CYASSL
+#include <cyassl/ssl.h>
+#endif
 
 #include <common/config.h>
 #include <common/mini-clist.h>
@@ -81,7 +84,7 @@
 #define SRV_EWGHT_RANGE (SRV_UWGHT_RANGE * BE_WEIGHT_SCALE)
 #define SRV_EWGHT_MAX   (SRV_UWGHT_MAX   * BE_WEIGHT_SCALE)
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 /* server ssl options */
 #define SRV_SSL_O_NONE         0x0000
 #define SRV_SSL_O_NO_VMASK     0x000F /* force version mask */
@@ -193,11 +196,16 @@ struct server {
 		int send_proxy;                 /* send a PROXY protocol header with checks */
 	} check;
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 	int use_ssl;				/* ssl enabled */
 	struct {
+#ifdef USE_CYASSL
+		CYASSL_CTX *ctx;
+		CYASSL_SESSION *reused_sess;
+#else
 		SSL_CTX *ctx;
 		SSL_SESSION *reused_sess;
+#endif
 		char *ciphers;			/* cipher suite to use if non-null */
 		int options;			/* ssl options */
 		int verify;			/* verify method (set of SSL_VERIFY_* flags) */

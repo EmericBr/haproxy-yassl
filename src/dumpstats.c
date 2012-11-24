@@ -58,8 +58,12 @@
 #include <proto/stream_interface.h>
 #include <proto/task.h>
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+#include <proto/cyassl_sock.h>
+#else
 #include <proto/ssl_sock.h>
+#endif
 #endif
 
 static int stats_dump_raw_to_buffer(struct stream_interface *si);
@@ -3429,8 +3433,13 @@ static inline const char *get_conn_xprt_name(const struct connection *conn)
 	if (conn->xprt == &raw_sock)
 		return "RAW";
 
+
 #ifdef USE_OPENSSL
 	if (conn->xprt == &ssl_sock)
+		return "SSL";
+#endif
+#ifdef USE_CYASSL
+	if (conn->xprt == &cyassl_sock)
 		return "SSL";
 #endif
 	snprintf(ptr, sizeof(ptr), "%p", conn->xprt);

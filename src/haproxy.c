@@ -100,8 +100,12 @@
 #include <proto/cttproxy.h>
 #endif
 
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+#include <proto/cyassl_sock.h>
+#else
 #include <proto/ssl_sock.h>
+#endif
 #endif
 
 /*********************************************************************/
@@ -148,7 +152,7 @@ struct global global = {
 
 
 	},
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
 #ifdef DEFAULT_MAXSSLCONN
 	.maxsslconn = DEFAULT_MAXSSLCONN,
 #endif
@@ -1080,13 +1084,17 @@ void deinit(void)
 
 		/* Release unused SSL configs. */
 		list_for_each_entry_safe(bind_conf, bind_back, &p->conf.bind, by_fe) {
-#ifdef USE_OPENSSL
+#if defined(USE_OPENSSL) || defined(USE_CYASSL)
+#ifdef USE_CYASSL
+			cyassl_sock_free_all_ctx(bind_conf);
+#else
 			ssl_sock_free_all_ctx(bind_conf);
+#endif
 			free(bind_conf->ca_file);
 			free(bind_conf->ciphers);
 			free(bind_conf->ecdhe);
 			free(bind_conf->crl_file);
-#endif /* USE_OPENSSL */
+#endif
 			free(bind_conf->file);
 			free(bind_conf->arg);
 			LIST_DEL(&bind_conf->by_fe);
